@@ -1,0 +1,66 @@
+# Based on this tutorial: https://www.youtube.com/watch?v=dbDzPIv8Cf8&t=68s
+networks:
+  default:
+    external: true
+    name: bookstacknetwork
+
+services:
+  # The container for BookStack itself
+  bookstack:
+    image: lscr.io/linuxserver/bookstack:latest
+    restart: unless-stopped
+    container_name: bookstack
+    env_file: bookstack.env  # Bookstack settings controlled by env vars
+    volumes:
+      - ./bookstack:/config
+    depends_on:
+      - bookstack_db
+    environment:  # Env vars that should be more static we define manually
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ}
+      # DB credentials sourced from .env file
+      - DB_HOST=bookstack_db
+      - DB_PORT=3306
+      - DB_DATABASE=${DB_DATABASE}
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+
+  # The container for the bookstack sql database.
+  bookstack_db:
+    # Use latest image by default
+    image: lscr.io/linuxserver/mariadb:latest
+    restart: unless-stopped
+    container_name: bookstack_db
+    volumes:
+      # Folder must exist
+      - ./database:/config
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ}
+      # DB Credentials sourced from .env file
+      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${DB_DATABASE}
+      - MYSQL_USER=${DB_USERNAME}
+      - MYSQL_PASSWORD=${DB_PASSWORD}
+    # These ports are commented out as you don't really need this port
+    # exposed for normal use, mainly only if connecting direct the the
+    # database externally. Otherwise, this risks exposing access to the
+    # database when not needed.
+    # ports:
+    #   - 3306:3306
+    
+  # The container for the nginx proxy manager. Exposes bookstack externally and manages SSL 
+  proxy:
+    image: 'jc21/nginx-proxy-manager:latest'
+    restart: unless-stopped
+    ports:
+      - '80:80' # Public HTTP Port. Required to access proxy manager and set up SSL
+      - '443:443' # Public HTTPS Port. For routing SSL to bookstack
+      - '81:81' # Admin Web Port.
+    environment:
+      TZ: ${TZ}
+    volumes:
+      - ./proxy/data:/data  # The proxy should use sqlite by default for database of some sort.
+      - ./proxy/letsencrypt:/etc/letsencrypt
