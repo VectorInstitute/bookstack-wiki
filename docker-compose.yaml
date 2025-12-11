@@ -50,6 +50,30 @@ services:
     # database when not needed.
     # ports:
     #   - 3306:3306
+
+  # A copy of the bookstack image that runs a queue worker to handle emails and other async actions in the background
+  bookstack_queue_worker:
+    image: lscr.io/linuxserver/bookstack:latest
+    restart: unless-stopped
+    env_file: bookstack.env  # Bookstack settings controlled by env vars
+    container_name: bookstack_queue_worker
+    # The command starts the queue worker
+    command: ["php", "artisan", "queue:work", "--sleep=3", "--tries=3"]
+    volumes:
+      - ./bookstack:/config
+    depends_on:
+      - bookstack
+    environment:  # Env vars that should be more static we define manually
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ}
+      # DB credentials sourced from .env file
+      - DB_HOST=bookstack_db
+      - DB_PORT=3306
+      - DB_DATABASE=${DB_DATABASE}
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      
     
   # The container for the nginx proxy manager. Exposes bookstack externally and manages SSL 
   proxy:
