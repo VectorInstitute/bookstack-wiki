@@ -10,6 +10,23 @@ contents of this file into the "Custom HTML Head Content" field.
 */
 /* ============================= */
 
+/* Set default background color for collapsible content blocks */
+  
+/* Light mode (default) */
+details > summary {
+    background-color: #EB088A !important;
+    color: white !important;  /* Summary font must be white */
+    cursor: pointer !important;
+    padding: 0.5em 0.75em !important;
+    font-weight: 600 !important;
+}
+
+/* Dark mode */
+html.dark-mode details > summary {
+    background-color: #941A5C !important; /* Different color in dark mode */
+    color: #CCCCCC !important;
+}
+
 /* ============================= */
 /*
 The settings below modify how Markdown is rendered to make it more similar to the 
