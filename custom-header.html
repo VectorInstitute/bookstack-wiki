@@ -10,7 +10,7 @@ contents of this file into the "Custom HTML Head Content" field.
 */
 /* ============================= */
 
-/* This section customizes collapsible content blocks to match the Vector theme */
+/* Set default background color for collapsible content blocks */
   
 /* Light mode (default) */
 details > summary {
@@ -25,6 +25,17 @@ details > summary {
 html.dark-mode details > summary {
     background-color: #941A5C !important; /* Different color in dark mode */
     color: #E5E5E5 !important;
+}
+
+/* Ensure elements within details inherit color */
+details p,
+details ul,
+details ol,
+details li,
+details strong,
+details em,
+details del {
+  color: inherit !important;
 }
 
 /* ============================= */
@@ -159,9 +170,7 @@ html.dark-mode {
 
 /* ============================= */
 
-/* The settings below create custom callouts to match the github style callouts */
-
-/* Add small margin to bottom of all callouts and get rid of internal bottom padding*/
+/* Add small margin to bottom of all callouts */
 .callout {
   margin-bottom: 1em !important;
   padding-bottom: 0em !important;
