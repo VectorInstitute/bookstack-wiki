@@ -10,12 +10,12 @@ contents of this file into the "Custom HTML Head Content" field.
 */
 /* ============================= */
 
-/* Set default background color for collapsible content blocks */
+/* This section customizes collapsible content blocks to match the Vector theme */
   
 /* Light mode (default) */
 details > summary {
     background-color: #EB088A !important;
-    color: white !important;  /* Summary font must be white */
+    color: #FFFFFF !important;  /* Summary font must be white */
     cursor: pointer !important;
     padding: 0.5em 0.75em !important;
     font-weight: 600 !important;
@@ -24,7 +24,7 @@ details > summary {
 /* Dark mode */
 html.dark-mode details > summary {
     background-color: #941A5C !important; /* Different color in dark mode */
-    color: #CCCCCC !important;
+    color: #E5E5E5 !important;
 }
 
 /* ============================= */
@@ -159,11 +159,26 @@ html.dark-mode {
 
 /* ============================= */
 
-/* Add small margin to bottom of all callouts so that when using div there is a space */
+/* The settings below create custom callouts to match the github style callouts */
+
+/* Add small margin to bottom of all callouts and get rid of internal bottom padding*/
 .callout {
   margin-bottom: 1em !important;
+  padding-bottom: 0em !important;
 }
 
+/* Ensure elements within callout inherit color */
+.callout p,
+.callout ul,
+.callout ol,
+.callout li,
+.callout strong,
+.callout em,
+.callout del {
+  color: inherit !important;
+}
+  
+/* Note callout - Blue */
 .callout.note {
   border-left-color: #0056a3 !important;
   background-color: transparent !important;
@@ -191,6 +206,7 @@ html.dark-mode {
   background-position: left center !important;
   background-repeat: no-repeat !important;
   background-size: 1.2em 1.2em !important;
+  overflow: visible !important;
 }
 
 /* Important callout - Purple */
