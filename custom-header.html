@@ -11,7 +11,6 @@ contents of this file into the "Custom HTML Head Content" field.
 /* ============================= */
 
 /* Set default background color for collapsible content blocks */
-  
 /* Light mode (default) */
 details > summary {
     background-color: #EB088A !important;
@@ -37,7 +36,7 @@ details em,
 details del {
   color: inherit !important;
 }
-
+  
 /* ============================= */
 /*
 The settings below modify how Markdown is rendered to make it more similar to the 
@@ -172,8 +171,8 @@ html.dark-mode {
 
 /* Add small margin to bottom of all callouts */
 .callout {
+  padding-bottom: 0.5em !important;
   margin-bottom: 1em !important;
-  padding-bottom: 0em !important;
 }
 
 /* Ensure elements within callout inherit color */
@@ -186,6 +185,17 @@ html.dark-mode {
 .callout del {
   color: inherit !important;
 }
+
+/* Remove margin on last element since callout already has bottom padding */
+.callout p:last-child,
+.callout ul:last-child,
+.callout ol:last-child,
+.callout li:last-child,
+.callout blockquote:last-child,
+.callout pre:last-child,
+.callout code:last-child {
+    margin-bottom: 0 !important;
+}  
   
 /* Note callout - Blue */
 .callout.note {
