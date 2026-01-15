@@ -1,29 +1,15 @@
-Install dependencies
+# Vector Bookstack Wiki
 
-```bash
-# Install docker using convenience script
-curl -fsSL https://get.docker.com -o get-docker.sh
-sh get-docker.sh
-# Add user to dockergroup
-sudo usermod -aG docker $USER
-```
+This repository contains the instructions on setting up a Bookstack Wiki. 
 
-Create docker network if it does not already exist
-```bash
-# Check if bookstacknetwork exists
-docker network ls
-# If not create it
-docker network create bookstacknetwork
-```
+The Vector Institute Bookstack is hosted at [bookstack.vectorinstitute.ai](https://bookstack.vectorinstitute.ai)
 
-Set up firewall rule to enable port 81
-- Create Firewall Rule
-- Set 81 for TCP Ports
-- Set source IPv4 Ranges to `0.0.0.0/0`
-- Simple approach, go to vm in gcloud, click on 3 dots and click view network details. Set target to all targets on network
-- Alternate approach. Select specific target tags for targets and set a target tag such as allow-tcp-81, apply the same tag to the VM Instance.
+For instructions on deploying the system refer to [DEPLOY.md](docs/DEPLOY.md)
 
-Log in create user account.
+## Details
 
-Create proxy for domain
+This implementation use docker compose and docker containers to deploy a Bookstack instance within a google cloud compute instance.
 
+- It is heavily based on this [tutorial video](https://www.youtube.com/watch?v=dbDzPIv8Cf8). 
+- The docker container that we use is maintained by [LinuxServer.io](https://www.linuxserver.io) and is hosted in the [linuxserver/docker-bookstack](https://github.com/linuxserver/docker-bookstack) repository. 
+- The aieng-auth OIDC server is used for authentication, details on that project or setting up your own OIDC server can be found in the [VectorInstitute/aieng-auth](https://github.com/VectorInstitute/aieng-auth) repository.
