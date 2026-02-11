@@ -13,15 +13,21 @@ gcloud config set compute/region northamerica-northeast2
 gcloud config set compute/zone northamerica-northeast2-b
 ```
 
-## 2. Reserve a static IP address:
-First you must reserve a static IP address so that if you restart your instance it will always have the same IP address. Reserve one with:
+## 2. Reserve static IP addresses:
+First you must reserve a regional static IP address for the VM so that if you restart your instance it will always have the same IP address. Reserve one with:
 
 ```bash
 gcloud compute addresses create {ADDRESS_NAME} \
     --region northamerica-northeast2  # Or whatever region you plan on using
 ```
 
-Next run the following command and copy the external IP address you just reserved.
+You also need a global static IP for the HTTPS load balancer:
+
+```bash
+gcloud compute addresses create {LB_ADDRESS_NAME} --global
+```
+
+Run the following command and note both IP addresses:
 
 ```bash
 gcloud compute addresses list
@@ -74,21 +80,23 @@ gcloud compute disks add-resource-policies {BOOT_DISK_NAME} \
 
 See [Create snapshot schedules](https://docs.cloud.google.com/compute/docs/disks/scheduled-snapshots#attach_snapshot_schedule) for further documentation.
 
-## 5. Allow traffic on port 81 for Nginx Proxy Manager:
+## 5. Allow traffic from GCP load balancer and health checks:
 
-Create a firewall rule that allows traffic on port 81:
+Create a firewall rule that allows the GCP load balancer and health check probes to reach port 80 on the VM. The source ranges are Google's well-known load balancer and health check IP ranges:
 
 ```bash
 gcloud compute firewall-rules create {FIREWALL_RULE_NAME} \
-    --description {FIREWALL_RULE_DESCRIPTION} \
-    --allow tcp:81 \
-    --direction INGRESS \
+    --description "Allow GCP LB and health checks to reach BookStack on port 80" \
+    --allow tcp:80 \
+    --source-ranges 130.211.0.0/22,35.191.0.0/16 \
+    --target-tags http-server \
+    --direction INGRESS
 ```
 
-See [Use VPC firewall rules](https://docs.cloud.google.com/firewall/docs/using-firewalls?_gl=1*1i0xau7*_ga*MTA0ODIyMjU5Ni4xNzYwNDY5Njgx*_ga_WH2QY8WWF5*czE3Njg1MDM3NTYkbzIkZzEkdDE3Njg1MDk1ODAkajUwJGwwJGgw) and [firewall-rules create](https://docs.cloud.google.com/sdk/gcloud/reference/compute/firewall-rules/create) for further documentation.
-
 > [!NOTE]
-> Currently our firewall rule applies to all instances on the default network. This should be updated by using the `--target-tags` to specify a tag which the instance must have before applying the rule. Then apply that tag to the compute instance.
+> This rule restricts port 80 access to only Google's internal load balancer infrastructure. The VM's port 80 is not reachable from the public internet.
+
+See [Use VPC firewall rules](https://docs.cloud.google.com/firewall/docs/using-firewalls) and [firewall-rules create](https://docs.cloud.google.com/sdk/gcloud/reference/compute/firewall-rules/create) for further documentation.
 
 ## 6. Install Dependencies on Instance:
 
@@ -133,7 +141,7 @@ An example `.env` file is included in this repo at [example.env](../example.env)
 
 Bookstack settings can be configured through environment variables. These are set in [bookstack.env](../bookstack.env). You will have to override both the `APP_URL` and `APP_KEY` variables.
 
-The `APP_URL` must be a domain name that points the the static external IP that you assigned to your GCP VM instance. If you do not have a domain, you can set this variable to the IP address itself.
+The `APP_URL` must be a domain name that points to the global static IP reserved for the load balancer (not the VM's regional IP). If you do not have a domain, you can set this variable to the IP address itself.
 
 The `APP_KEY` must be a unique session encryption key. Generate one with the following command:
 
@@ -159,7 +167,7 @@ This project uses the latest version by default with the latest image tag. Check
 docker image inspect lscr.io/linuxserver/bookstack:latest 
 ```
 
-## 10. Start Bookstack instance:
+## 11. Start Bookstack instance:
 
 Navigate to the repo and use docker compose to start the application.
 
@@ -169,42 +177,83 @@ docker compose pull  # Pull container images
 docker compose up -d  # -d flag just detaches you from the logs
 ```
 
-## 11. Set up HTTPS:
+## 12. Set up HTTPS with GCP Load Balancer:
 
-> [!WARNING]
-> For some reason access to the admin panel stopped working for me. I'm not sure what caused it but if you run into this issue it can be resolved by using the external IP instead of the app url when navigating to the admin panel in the browser. Eg. `{IP}:81`
+SSL is handled by a GCP External Application Load Balancer with a Google-managed certificate. The load balancer terminates SSL at Google's edge and forwards plain HTTP to the VM on port 80 over Google's internal network.
 
-Navigate to `{APP_URL}:81` in your browser to access the NPM Admin Panel. The initial log in credentials will be:
-
-```
-Email:      admin@example.com
-Password:   changeme
-```
-
-Upon logging in, you will be prompted to change the email and password of the Admin account. Make sure you write this down somewhere as it is really inconvenient to reset if you forget. I reccommend adding a couple admin users so that if one person forgets their credentials another admin can log in and reset their account.
-
-Click on `Proxy Hosts` -> `Add Proxy Host`. Fill out the fields as follows:
+### a. Create a Google-managed SSL certificate:
 
 ```bash
-# Details:
-Domain Names:           {APP_URL}   # Eg. bookstack.vectorinstitute.ai
-Scheme:                 http        # This is for the proxy system, not how you will access through the browser
-Forward Hostname/IP:    bookstack   # Since we created a docker network, we can use the container name of the bookstack container instead of it's internal IP
-Forward Port:           80
-Access List:            Publicly Accessible
-Block Common Exploits:  True
-# SSL:
-SSL Certificate:        Request a new Certificate
-Force SSL:              True  # Only allow HTTPS connections
-HTTP/2 Support:         True
-HSTS Enabled:           True
+gcloud compute ssl-certificates create {CERT_NAME} \
+    --domains={APP_URL} \
+    --global
 ```
 
-You can play around with some of the above settings if you want. Click save when you are done.
+> [!NOTE]
+> The certificate will not activate until DNS for the domain points to the load balancer's global IP address (see step d). Provisioning can take up to 24 hours after DNS is updated but is usually much faster.
 
-You should now be able to access your bookstack instance by navigating to `https://{APP_URL}`
+### b. Create an instance group and health check:
 
-## 12. Log into Bookstack:
+```bash
+# Create an unmanaged instance group and add the VM to it
+gcloud compute instance-groups unmanaged create {IG_NAME} \
+    --zone=northamerica-northeast2-b
+
+gcloud compute instance-groups unmanaged add-instances {IG_NAME} \
+    --zone=northamerica-northeast2-b \
+    --instances={INSTANCE_NAME}
+
+gcloud compute instance-groups unmanaged set-named-ports {IG_NAME} \
+    --named-ports=http:80 \
+    --zone=northamerica-northeast2-b
+
+# Create a health check (use a path that returns HTTP 200)
+gcloud compute health-checks create http {HEALTH_CHECK_NAME} \
+    --port=80 \
+    --request-path=/
+```
+
+### c. Create the backend service, URL map, proxy, and forwarding rule:
+
+```bash
+# Backend service
+gcloud compute backend-services create {BACKEND_NAME} \
+    --protocol=HTTP \
+    --port-name=http \
+    --health-checks={HEALTH_CHECK_NAME} \
+    --global
+
+gcloud compute backend-services add-backend {BACKEND_NAME} \
+    --instance-group={IG_NAME} \
+    --instance-group-zone=northamerica-northeast2-b \
+    --global
+
+# URL map (routes all traffic to the backend)
+gcloud compute url-maps create {URL_MAP_NAME} \
+    --default-service={BACKEND_NAME}
+
+# HTTPS target proxy (ties the SSL cert to the URL map)
+gcloud compute target-https-proxies create {HTTPS_PROXY_NAME} \
+    --ssl-certificates={CERT_NAME} \
+    --url-map={URL_MAP_NAME}
+
+# Forwarding rule (binds the global IP to the proxy on port 443)
+gcloud compute forwarding-rules create {FORWARDING_RULE_NAME} \
+    --global \
+    --address={LB_ADDRESS_NAME} \
+    --target-https-proxy={HTTPS_PROXY_NAME} \
+    --ports=443
+```
+
+### d. Update DNS:
+
+Point `{APP_URL}` to the global load balancer IP (reserved in step 2). The Google-managed SSL certificate will automatically provision once DNS resolves correctly.
+
+### e. Verify:
+
+Once DNS has propagated and the certificate is active, you should be able to access your bookstack instance at `https://{APP_URL}`
+
+## 13. Log into Bookstack:
 
 Log in to your bookstack instance with the default admin credentials:
 
