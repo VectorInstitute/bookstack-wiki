@@ -23,6 +23,8 @@ services:
     restart: unless-stopped
     container_name: bookstack
     env_file: bookstack.env  # Non-confidential Bookstack settings controlled by env vars
+    ports:
+      - '80:80' # Exposed to GCP Load Balancer for HTTP traffic (SSL terminated at LB)
     volumes:
       - ./bookstack:/config
     depends_on:
@@ -68,20 +70,21 @@ services:
     # ports:
     #   - 3306:3306
 
-  # Nginx Proxy Manager:
-  #   The container for the nginx proxy manager. Exposes bookstack container externally and manages SSL 
-  proxy:
-    image: 'jc21/nginx-proxy-manager:latest'
-    restart: unless-stopped
-    ports:
-      - '80:80' # Public HTTP Port. Required to access proxy manager and set up SSL
-      - '443:443' # Public HTTPS Port. For routing SSL to bookstack
-      - '81:81' # Admin Web Port.
-    environment:
-      TZ: ${TZ}
-    volumes:
-      - ./proxy/data:/data  # The proxy should use sqlite by default for database of some sort.
-      - ./proxy/letsencrypt:/etc/letsencrypt
+  # Nginx Proxy Manager: REMOVED
+  #   SSL is now terminated by the GCP External Application Load Balancer
+  #   with a Google-managed certificate. NPM is no longer needed.
+  # proxy:
+  #   image: 'jc21/nginx-proxy-manager:latest'
+  #   restart: unless-stopped
+  #   ports:
+  #     - '80:80'
+  #     - '443:443'
+  #     - '81:81'
+  #   environment:
+  #     TZ: ${TZ}
+  #   volumes:
+  #     - ./proxy/data:/data
+  #     - ./proxy/letsencrypt:/etc/letsencrypt
 
   # Queue worker container kept restarting. Only really needed if enabling mail which we have turned off right now
   # Bookstack Queue Worker:
