@@ -22,13 +22,34 @@ log "Dumping MariaDB ($DB_DATABASE)..."
 docker exec bookstack_db   mysqldump -u"$DB_USERNAME" -p"$DB_PASSWORD"   --single-transaction --quick --lock-tables=false   "$DB_DATABASE" | gzip > "$TMPDIR/bookstack_db.sql.gz"
 log "  DB: $(du -sh "$TMPDIR/bookstack_db.sql.gz" | cut -f1)"
 
+# Uploads live under the container's /config/www, which the BookStack image
+# symlinks into place:
+#   /app/www/public/uploads          -> /config/www/uploads   (page images)
+#   /app/www/storage/uploads/files   -> /config/www/files      (attachments)
+#   /app/www/storage/uploads/images  -> /config/www/images
+# Archive the real host directories, not the in-container symlink paths.
 log "Archiving uploads..."
-sudo tar -czf "$TMPDIR/uploads.tar.gz"   -C "$WIKI_DIR/bookstack/www"   public/uploads storage/uploads 2>/dev/null || true
+sudo tar -czf "$TMPDIR/uploads.tar.gz" \
+  -C "$WIKI_DIR/bookstack/www" \
+  uploads files images themes
 log "  Uploads: $(du -sh "$TMPDIR/uploads.tar.gz" | cut -f1)"
 
 log "Archiving config..."
-sudo tar -czf "$TMPDIR/config.tar.gz"   -C "$WIKI_DIR"   bookstack.env .env custom-header.html docker-compose.yaml 2>/dev/null || true
+sudo tar -czf "$TMPDIR/config.tar.gz" \
+  -C "$WIKI_DIR" \
+  bookstack.env .env custom-header.html docker-compose.yaml \
+  bookstack/www/.env
 log "  Config: $(du -sh "$TMPDIR/config.tar.gz" | cut -f1)"
+
+# Guard against silently backing up nothing. An empty gzipped tar is ~45 bytes;
+# anything under 1 KB means the archive step captured no real data.
+for f in bookstack_db.sql.gz uploads.tar.gz config.tar.gz; do
+  size=$(stat -c %s "$TMPDIR/$f")
+  if [ "$size" -lt 1024 ]; then
+    log "ERROR: $f is only ${size} bytes - refusing to upload an empty backup"
+    exit 1
+  fi
+done
 
 log "Uploading to $BUCKET/$DATE/..."
 for f in bookstack_db.sql.gz uploads.tar.gz config.tar.gz; do
