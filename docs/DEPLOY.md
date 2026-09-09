@@ -49,9 +49,53 @@ gcloud compute instances create {INSTANCE_NAME} \
     --boot-disk-size 64GB \  # Ensure you have enough space as database is stored right on disk
 ```
 
-## 4. Create a snapshot schedule:
+## 4. Backups:
 
-Currently we don't do any special form of backups for the bootstack instance (although it is possible). Instead we rely on the GCP snapshot feature to just back up the entire disk on a set schedule. This is much simpler and easy to implement. First create a snapshot schedule:
+Backups run at two levels: nightly application backups to GCS, and scheduled
+whole-disk snapshots.
+
+### 4a. Application backups to GCS
+
+[backup.sh](../backup.sh) dumps the MariaDB database, archives the uploads
+(page images, attachments) and the config files, and uploads all three to
+`gs://bookstack-backups-vectorinstitute/{date}/`. A bucket lifecycle rule
+deletes objects after 30 days. It runs from root's crontab on the VM:
+
+```
+0 2 * * * /bookstack-wiki/backup.sh >> /var/log/bookstack-backup.log 2>&1
+```
+
+The script needs a service account key at
+`/bookstack-wiki/bookstack-backup-sa-key.json` with write access to the bucket.
+
+To run one on demand, and to check the last scheduled run:
+
+```bash
+sudo /bookstack-wiki/backup.sh
+tail -20 /var/log/bookstack-backup.log
+gcloud storage ls gs://bookstack-backups-vectorinstitute/
+```
+
+> [!IMPORTANT]
+> The uploads live at `bookstack/www/{uploads,files,images}` on the host. Inside
+> the container those appear as `public/uploads` and `storage/uploads`, but
+> those are symlinks - archiving the in-container paths from the host silently
+> produces an empty archive. The script aborts if any archive comes out under
+> 1KB, so an empty backup fails loudly rather than being uploaded.
+
+### 4b. Disk snapshot schedule
+
+Snapshots back up the entire disk on a set schedule, which covers the cases the
+application backup does not (the VM itself, docker state, cron, system config).
+Take an on-demand snapshot before any upgrade:
+
+```bash
+gcloud compute disks snapshot aieng-bookstack \
+    --zone northamerica-northeast2-b \
+    --snapshot-names aieng-bookstack-pre-upgrade-$(date -u +%Y%m%d)
+```
+
+To create the recurring schedule:
 
 ```bash
 gcloud compute resource-policies create snapshot-schedule {SHCEDULE_NAME} \
