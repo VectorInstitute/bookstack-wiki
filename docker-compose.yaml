@@ -19,7 +19,8 @@ services:
 
   # Bookstack Container:
   bookstack:
-    image: lscr.io/linuxserver/bookstack:latest
+    # Pinned: bump deliberately to update. ':latest' does not pull on restart.
+    image: lscr.io/linuxserver/bookstack:version-v26.05.4
     restart: unless-stopped
     container_name: bookstack
     env_file: bookstack.env  # Non-confidential Bookstack settings controlled by env vars
@@ -47,8 +48,10 @@ services:
   # Database Container:
   #   Runs the sql database that bookstack uses to store data.
   bookstack_db:
-    # Use latest image by default
-    image: lscr.io/linuxserver/mariadb:latest
+    # Pinned to the 11.4 LTS line (no floating '11.4' tag is published).
+    # Never move this to ':latest' - a major-version jump performs an
+    # in-place data-dir upgrade that cannot be rolled back.
+    image: lscr.io/linuxserver/mariadb:version-11.4.8-r0
     restart: unless-stopped
     container_name: bookstack_db
     volumes:
@@ -70,21 +73,8 @@ services:
     # ports:
     #   - 3306:3306
 
-  # Nginx Proxy Manager: REMOVED
-  #   SSL is now terminated by the GCP External Application Load Balancer
-  #   with a Google-managed certificate. NPM is no longer needed.
-  # proxy:
-  #   image: 'jc21/nginx-proxy-manager:latest'
-  #   restart: unless-stopped
-  #   ports:
-  #     - '80:80'
-  #     - '443:443'
-  #     - '81:81'
-  #   environment:
-  #     TZ: ${TZ}
-  #   volumes:
-  #     - ./proxy/data:/data
-  #     - ./proxy/letsencrypt:/etc/letsencrypt
+  # Nginx Proxy Manager was removed when SSL moved to the GCP External
+  # Application Load Balancer with a Google-managed certificate.
 
   # Queue worker container kept restarting. Only really needed if enabling mail which we have turned off right now
   # Bookstack Queue Worker:
