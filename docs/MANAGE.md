@@ -1,10 +1,14 @@
 # Managing Bookstack
 
-The Vector Bookstack instance runs as a docker compose application. There are three containers that run each of the following:
+The Vector Bookstack instance runs as a docker compose application. There are two containers that run each of the following:
 
 - Bookstack
 - Bookstack SQL Database
-- Nginx Proxy Manager
+
+> [!NOTE]
+> Nginx Proxy Manager used to run as a third container to terminate SSL. It was
+> removed when SSL moved to the GCP External Application Load Balancer with a
+> Google-managed certificate.
 
 Many Bookstack settings can be configured through the UI under the `Settings` tab as long as you have admin level permissions. Refer to the [Bookstack admin documentation](https://www.bookstackapp.com/docs/admin/installation/) for details on what all the settings do. Some notable highlights:
 
@@ -28,6 +32,60 @@ docker compose up -d  # Start instance
 If for some reason you need to change some env var settings but don't want to stop the bookstack instance, you can instead set them by adding them to the `bookstack-wiki/bookstack/www/.env` file. The `.env` file in this directory contains al lot of default bookstack settings, any settings in this file are overwritten by environment variables that are set in the container. Hence variables set in `bookstack.env` will take precedence over variables set in `bookstack/www/.env`. 
 
 Refer to [env.example.complete](https://github.com/BookStackApp/BookStack/blob/development/.env.example.complete) for a complete list of available env var settings. There are a lot to explore.
+
+## Updating Bookstack
+
+Both container images are **pinned to explicit version tags** in
+[docker-compose.yaml](../docker-compose.yaml). This is deliberate: they used to
+be on `:latest`, and because a restart never re-pulls, the instance sat on a
+nine-month-old image while appearing healthy. Pinning means updates only happen
+when someone bumps the tag on purpose.
+
+To update Bookstack:
+
+1. Check the [BookStack release notes](https://github.com/BookStackApp/BookStack/releases)
+   for breaking changes, then find the matching tag on
+   [lscr.io/linuxserver/bookstack](https://github.com/linuxserver/docker-bookstack/pkgs/container/bookstack).
+2. Take a backup and a disk snapshot first (see [DEPLOY.md](DEPLOY.md#4-backups)).
+3. Bump the `image:` tag in `docker-compose.yaml`, then:
+
+```bash
+cd /bookstack-wiki
+sudo docker compose pull bookstack
+sudo docker compose up -d bookstack
+sudo docker logs -f bookstack   # watch the DB migrations run
+```
+
+Bookstack runs any pending database migrations automatically on startup, so
+the upgrade is not reversible by simply re-pinning the old tag - you would need
+to restore the database from backup. Always snapshot first.
+
+> [!WARNING]
+> The database is pinned to the MariaDB 11.4 LTS line. Do **not** move it to
+> `:latest`. A major-version jump performs an in-place data-directory upgrade
+> that cannot be rolled back. To move within 11.4, bump to a newer
+> `version-11.4.x-r0` tag.
+
+> [!NOTE]
+> Schema changes between major Bookstack versions can rename or remove tables.
+> The v26.05 release consolidated the `pages`, `books` and `chapters` tables
+> into a single `entities` table with `entity_page_data` / `entity_container_data`.
+> Any external scripts querying the database directly need checking after an
+> upgrade.
+
+## Host OS updates
+
+`unattended-upgrades` is enabled on the VM and installs security updates
+automatically, but kernel updates only take effect after a reboot. Check
+whether one is pending:
+
+```bash
+gcloud compute ssh aieng-bookstack --tunnel-through-iap \
+  --command="cat /var/run/reboot-required 2>/dev/null || echo 'no reboot needed'"
+```
+
+Rebooting causes roughly a minute of downtime. Both containers use
+`restart: unless-stopped`, so they come back automatically.
 
 ## Additional Notes/TODO List
 
