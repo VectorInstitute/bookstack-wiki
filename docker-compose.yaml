@@ -28,6 +28,11 @@ services:
       - '80:80' # Exposed to GCP Load Balancer for HTTP traffic (SSL terminated at LB)
     volumes:
       - ./bookstack:/config
+      # Tracked theme overrides, enabled with APP_THEME=vector in bookstack.env.
+      # Read-only and root-owned on the host so the web process can't rewrite
+      # its own PHP templates. The resulting "Permissions could not be set"
+      # warning from the linuxserver init script is expected and harmless.
+      - ./themes:/config/www/themes:ro
     depends_on:
       - bookstack_db
     environment:  # Env vars that should be more static we define manually

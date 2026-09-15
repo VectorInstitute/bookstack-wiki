@@ -14,6 +14,7 @@ Many Bookstack settings can be configured through the UI under the `Settings` ta
 
 - **Customization:** Configure the look and feel of the UI.
   - I have added a custom CSS style header ([custom-header.html](../custom-header.html)) under the `Custom HTML Head Content` field. This mainly adds some custom github style callouts, makes the header styles look more like github flavoured markdown, and makes collapsible content blocks look nicer.
+  - View overrides live in [themes/vector](../themes/vector), mounted into the container and enabled with `APP_THEME=vector` in `bookstack.env`. Currently it only replaces the 404 page so that guests opening a restricted link are told to log in, instead of seeing "Page Not Found". When bumping the Bookstack image, diff each override against the upstream view it replaces.
 - **Maintenance:** The cleanup images button here can be used to delete old images from the database that aren't being used in any pages.
 - **Users and Roles:** These are self explanatory. Manage user permissions.
 - **Registration:** Here I have configured Bookstack to assign the `VectorStaff` role to anyone who logs in with a vectorinstitite.ai gmail account.
