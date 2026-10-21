@@ -47,6 +47,11 @@ To update Bookstack:
 1. Check the [BookStack release notes](https://github.com/BookStackApp/BookStack/releases)
    for breaking changes, then find the matching tag on
    [lscr.io/linuxserver/bookstack](https://github.com/linuxserver/docker-bookstack/pkgs/container/bookstack).
+   Prefer the build-specific `vX.Y.Z-lsNNN` tag over `version-vX.Y.Z`: linuxserver
+   rebuilds images for base-OS and PHP security fixes without changing the
+   BookStack version, and only the `-lsNNN` suffix tells you which build you run.
+   For a PHP security advisory, confirm the fix is in the image before deploying:
+   `docker run --rm --entrypoint php <image> -v`.
 2. Take a backup and a disk snapshot first (see [DEPLOY.md](DEPLOY.md#4-backups)).
 3. Bump the `image:` tag in `docker-compose.yaml`, then:
 
