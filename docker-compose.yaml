@@ -20,7 +20,7 @@ services:
   # Bookstack Container:
   bookstack:
     # Pinned: bump deliberately to update. ':latest' does not pull on restart.
-    image: lscr.io/linuxserver/bookstack:version-v26.05.4
+    image: lscr.io/linuxserver/bookstack:v26.09.2-ls292
     restart: unless-stopped
     container_name: bookstack
     env_file: bookstack.env  # Non-confidential Bookstack settings controlled by env vars
