@@ -126,19 +126,41 @@ See [Create snapshot schedules](https://docs.cloud.google.com/compute/docs/disks
 
 ## 5. Allow traffic from GCP load balancer and health checks:
 
-Create a firewall rule that allows the GCP load balancer and health check probes to reach port 80 on the VM. The source ranges are Google's well-known load balancer and health check IP ranges:
+The VM only needs two kinds of inbound traffic: the GCP load balancer and its health checks on port 80, and SSH through the IAP tunnel. Tag the VM `bookstack`, allow exactly those two, and deny everything else:
 
 ```bash
-gcloud compute firewall-rules create {FIREWALL_RULE_NAME} \
-    --description "Allow GCP LB and health checks to reach BookStack on port 80" \
-    --allow tcp:80 \
-    --source-ranges 130.211.0.0/22,35.191.0.0/16 \
-    --target-tags http-server \
-    --direction INGRESS
+gcloud compute instances add-tags {INSTANCE_NAME} --tags bookstack
+
+gcloud compute firewall-rules create bookstack-allow-lb-http \
+    --network default --direction INGRESS --priority 800 --action ALLOW \
+    --rules tcp:80 --source-ranges 35.191.0.0/16,130.211.0.0/22 \
+    --target-tags bookstack
+
+gcloud compute firewall-rules create bookstack-allow-iap-ssh \
+    --network default --direction INGRESS --priority 800 --action ALLOW \
+    --rules tcp:22 --source-ranges 35.235.240.0/20 \
+    --target-tags bookstack
+
+gcloud compute firewall-rules create bookstack-deny-other-ingress \
+    --network default --direction INGRESS --priority 900 --action DENY \
+    --rules all --source-ranges 0.0.0.0/0 \
+    --target-tags bookstack
 ```
 
-> [!NOTE]
-> This rule restricts port 80 access to only Google's internal load balancer infrastructure. The VM's port 80 is not reachable from the public internet.
+> [!IMPORTANT]
+> The deny rule is what does the work. An allow rule on its own restricts nothing, because the
+> project's `default` network also has `default-allow-http` / `default-allow-https`
+> (`0.0.0.0/0`, applied via the `http-server` / `https-server` tags) and
+> `default-allow-internal` (all ports from `10.128.0.0/9`). Those let any VM in the
+> network reach BookStack's nginx, sshd and the Ops Agent ports directly. The deny at
+> priority 900 overrides those defaults (priority 1000 and 65534), and the two allows
+> at 800 win over the deny. These rules are scoped to the `bookstack` tag, so other VMs
+> on the shared network are unaffected.
+>
+> To roll back, delete `bookstack-deny-other-ingress`. To check the rules, run a
+> [Connectivity Test](https://cloud.google.com/network-intelligence-center/docs/connectivity-tests/concepts/overview)
+> from another VM on the network to the BookStack VM on port 80. It should report
+> `UNREACHABLE`, dropped by `bookstack-deny-other-ingress`.
 
 See [Use VPC firewall rules](https://docs.cloud.google.com/firewall/docs/using-firewalls) and [firewall-rules create](https://docs.cloud.google.com/sdk/gcloud/reference/compute/firewall-rules/create) for further documentation.
 
